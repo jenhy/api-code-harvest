@@ -167,6 +167,11 @@ class Orchestrator:
             await vp.goto(verify_link, wait_until="domcontentloaded",
                           timeout=20000)
             await vp.wait_for_timeout(3000)
+            # 点击"去登录"按钮确认邮箱验证
+            go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")')
+            if await go_login.count() > 0:
+                await go_login.click()
+                await vp.wait_for_timeout(2000)
             await vp.close()
             hvoy_result.account.verified = True
             print("  >>> hvoy email verified!")
@@ -290,6 +295,11 @@ class Orchestrator:
         vp = await context.new_page()
         await vp.goto(verify_link, wait_until="domcontentloaded", timeout=20000)
         await vp.wait_for_timeout(3000)
+        # 点击"去登录"按钮确认邮箱验证
+        go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")')
+        if await go_login.count() > 0:
+            await go_login.click()
+            await vp.wait_for_timeout(2000)
         await vp.close()
 
         print(f"\n  >>> [3/9] hvoy.ai login...")

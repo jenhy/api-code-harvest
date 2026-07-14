@@ -52,8 +52,8 @@ class TestCunRegistrationResult:
         assert result.account.api_key == "sk-test123"
 
 
-class TestSliderWaitLogic:
-    """验证滑块等待逻辑参数"""
+class TestSliderLogic:
+    """验证滑块等待逻辑参数及 force-click 修复"""
 
     def test_slider_timeout_default(self):
         """验证默认超时 180 秒（3 分钟）"""
@@ -66,6 +66,12 @@ class TestSliderWaitLogic:
         sig = signature(CunRegistrar._wait_for_slider_login)
         assert sig.parameters["timeout"].default == 180
 
+    def test_no_force_click_on_send_button(self):
+        """验证注册流程不再使用 force=True 点击发送验证码"""
+        import inspect
+        source = inspect.getsource(CunRegistrar.register)
+        assert "force=True" not in source, "不应 force-click 已禁用的按钮"
+
 
 class TestRegisterSignature:
     """验证 register() 接受 gmail_api 参数"""
@@ -77,6 +83,40 @@ class TestRegisterSignature:
         assert "gmail_api" in params
         # gmail_api 应该有一个默认值
         assert params["gmail_api"].default is None
+
+
+class TestRedeemDetection:
+    """验证兑换成功检测逻辑的健壮性"""
+
+    def test_detect_redeem_success_default(self):
+        """验证 _detect_redeem_success 作为静态方法存在"""
+        assert hasattr(CunRegistrar, "_detect_redeem_success")
+        assert callable(CunRegistrar._detect_redeem_success)
+
+    def test_detect_success_with_success_text(self):
+        result = CunRegistrar._detect_redeem_success("兑换成功")
+        assert result is True
+
+    def test_detect_success_with_check_mark(self):
+        result = CunRegistrar._detect_redeem_success("✅ 兑换成功")
+        assert result is True
+
+    def test_detect_failure_with_error_text(self):
+        result = CunRegistrar._detect_redeem_success("兑换失败，邀请码无效")
+        assert result is False
+
+    def test_detect_failure_with_invalid_text(self):
+        result = CunRegistrar._detect_redeem_success("邀请码不存在或已使用")
+        assert result is False
+
+    def test_detect_failure_with_failed(self):
+        result = CunRegistrar._detect_redeem_success("operation failed")
+        assert result is False
+
+    def test_detect_neutral_text_defaults_success_if_not_explicitly_fail(self):
+        """中性的页面内容，如果没有明确失败关键词，默认视为成功"""
+        result = CunRegistrar._detect_redeem_success("some random page content")
+        assert result is True
 
 
 @pytest.mark.e2e

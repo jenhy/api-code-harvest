@@ -26,10 +26,8 @@ class TestHvoyRegistrarInstance:
         registrar = HvoyRegistrar()
         assert hasattr(registrar, "login")
         assert hasattr(registrar, "logout")
-        assert hasattr(registrar, "click_go_to_site")
         assert callable(registrar.login)
         assert callable(registrar.logout)
-        assert callable(registrar.click_go_to_site)
 
     def test_has_existing_methods(self):
         registrar = HvoyRegistrar()

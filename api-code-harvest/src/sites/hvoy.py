@@ -130,22 +130,6 @@ class HvoyRegistrar(HumanVerification):
             await page.close()
 
     # ------------------------------------------------------------------
-    # 跳转到 CUN
-    # ------------------------------------------------------------------
-
-    async def click_go_to_site(self, context: BrowserContext) -> None:
-        """在确认领取弹窗中点击"前往站点"按钮，跳转 CUN。"""
-        page = await context.new_page()
-        try:
-            go_btn = page.locator('button:has-text("前往站点")')
-            if await go_btn.count() == 0:
-                go_btn = page.locator('text=前往站点').first
-            await go_btn.click()
-            await page.wait_for_timeout(3000)
-        finally:
-            await page.close()
-
-    # ------------------------------------------------------------------
     # 登出 & 清理
     # ------------------------------------------------------------------
 

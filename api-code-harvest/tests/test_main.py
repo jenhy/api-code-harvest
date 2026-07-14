@@ -137,3 +137,21 @@ class TestOrchestratorInstance:
         assert alias == "ross.chen85.dev+hvoy001@gmail.com"
         alias_337 = orch._make_alias(337)
         assert alias_337 == "ross.chen85.dev+hvoy337@gmail.com"
+
+
+class TestVerificationFlow:
+    """验证验证链接打开后点击"去登录"按钮"""
+
+    def test_go_login_click_present_in_run_full(self):
+        """验证 _run_full 中打开验证链接后有点击"去登录"逻辑"""
+        import inspect
+        from src.main import Orchestrator
+        source = inspect.getsource(Orchestrator._run_full)
+        assert 'has-text("去登录")' in source, "应有点击'去登录'的逻辑"
+
+    def test_go_login_click_present_in_run_one_cycle(self):
+        """验证 _run_one_cycle 中打开验证链接后有点击"去登录"逻辑"""
+        import inspect
+        from src.main import Orchestrator
+        source = inspect.getsource(Orchestrator._run_one_cycle)
+        assert 'has-text("去登录")' in source, "应有点击'去登录'的逻辑"

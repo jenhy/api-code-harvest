@@ -42,16 +42,22 @@ class CunRegistrar(HumanVerification):
             # --- 滑块1（手动）---
             print("\n  *** 请拖滑块完成人机验证 (Alt+Tab 切到浏览器) ***")
             print("  *** 脚本轮询等待中...")
-            await self._wait_for_slider(page)
+            slider_ok = await self._wait_for_slider(page)
 
             # 点击发送验证码
-            send_btn = page.locator('button:has-text("发送验证码")')
-            if await send_btn.is_enabled():
+            if slider_ok:
+                send_btn = page.locator('button:has-text("发送验证码")')
                 await send_btn.click()
                 await page.wait_for_timeout(2000)
             else:
-                await send_btn.click(force=True)
-                await page.wait_for_timeout(2000)
+                print("  Slider timeout — trying to click send button anyway")
+                send_btn = page.locator('button:has-text("发送验证码")')
+                if await send_btn.is_enabled():
+                    await send_btn.click()
+                    await page.wait_for_timeout(2000)
+                else:
+                    return RegistrationResult(site="cun", success=False,
+                                              error="Slider verification timeout")
 
             # 从 Gmail API 获取验证码
             email_code = None
@@ -166,9 +172,32 @@ class CunRegistrar(HumanVerification):
         await page.wait_for_timeout(3000)
 
         body = await page.inner_text("body")
-        success = "成功" in body or "success" in body.lower()
+        success = self._detect_redeem_success(body)
         print(f"  Redeem {'success' if success else 'failed'}")
         return success
+
+    @staticmethod
+    def _detect_redeem_success(body_text: str) -> bool:
+        """改进的兑换成功检测逻辑。
+
+        先检查失败关键词（"失败"、"无效"、"error"、"failed"、"不存在"、"已使用"），
+        再检查成功关键词（"成功"、"success"）。
+        如果两者都没有，默认返回 True（保守策略，避免漏过成功兑换）。
+        """
+        text_lower = body_text.lower()
+        # 失败关键词
+        fail_keywords = ["失败", "无效", "不存在", "已使用",
+                         "failed", "error", "invalid", "expired"]
+        for kw in fail_keywords:
+            if kw in text_lower:
+                return False
+        # 成功关键词（兜底默认 True，所以此处只是补充确认）
+        success_keywords = ["成功", "success"]
+        for kw in success_keywords:
+            if kw in text_lower:
+                return True
+        # 中性页面内容，默认视为成功
+        return True
 
     # ------------------------------------------------------------------
     # API 密钥

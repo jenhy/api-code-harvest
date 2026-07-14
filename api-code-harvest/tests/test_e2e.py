@@ -1,6 +1,6 @@
 """E2E 测试 — 真实浏览器 + 页面选择器验证"""
 import pytest
-from playwright.sync_api import sync_playwright
+from patchright.sync_api import sync_playwright
 
 
 @pytest.mark.e2e

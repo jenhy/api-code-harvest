@@ -37,25 +37,43 @@ class GmailApi:
     # ------------------------------------------------------------------
 
     def _auth(self):
-        """Authenticate with Gmail API via OAuth. Caches token.pickle."""
+        """Authenticate with Gmail API via OAuth. Caches token.pickle.
+
+        Uses save/restore pattern for HTTPS_PROXY to avoid global env pollution.
+        """
+        # 保存原始环境变量
+        saved_https_proxy = os.environ.pop("HTTPS_PROXY", None)
+        saved_http_proxy = os.environ.pop("HTTP_PROXY", None)
+
         os.environ["HTTPS_PROXY"] = self.proxy
         os.environ["HTTP_PROXY"] = self.proxy
 
-        creds = None
-        if os.path.exists(self.token_pickle):
-            with open(self.token_pickle, "rb") as f:
-                creds = pickle.load(f)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+        try:
+            creds = None
+            if os.path.exists(self.token_pickle):
+                with open(self.token_pickle, "rb") as f:
+                    creds = pickle.load(f)
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_file, SCOPES
+                    )
+                    creds = flow.run_local_server(port=0)
+                with open(self.token_pickle, "wb") as f:
+                    pickle.dump(creds, f)
+            return creds
+        finally:
+            # 恢复原始环境变量
+            if saved_https_proxy is not None:
+                os.environ["HTTPS_PROXY"] = saved_https_proxy
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-            with open(self.token_pickle, "wb") as f:
-                pickle.dump(creds, f)
-        return creds
+                os.environ.pop("HTTPS_PROXY", None)
+            if saved_http_proxy is not None:
+                os.environ["HTTP_PROXY"] = saved_http_proxy
+            else:
+                os.environ.pop("HTTP_PROXY", None)
 
     @property
     def service(self):

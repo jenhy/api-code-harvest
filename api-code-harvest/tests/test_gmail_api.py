@@ -80,3 +80,46 @@ class TestConfigValidation:
     def test_custom_proxy(self):
         api = GmailApi("c.json", "t.pkl", proxy_host="10.0.0.1", proxy_port=8888)
         assert api.proxy == "http://10.0.0.1:8888"
+
+
+class TestProxyEnvCleanup:
+    """验证 _auth() 使用 save/restore 模式避免环境变量污染"""
+
+    def test_auth_restores_proxy_env_on_exception(self):
+        """验证 _auth() 即使抛出异常也恢复环境变量"""
+        import os
+        from src.email.gmail_api import GmailApi
+
+        # 1. 设置初始 HTTPS_PROXY
+        os.environ["HTTPS_PROXY"] = "http://original:3128"
+        original_proxy = os.environ["HTTPS_PROXY"]
+
+        api = GmailApi("nonexistent.json", "nope.pkl",
+                       proxy_host="10.0.0.1", proxy_port=8888)
+        try:
+            api._auth()
+        except Exception:
+            pass
+
+        # 2. 验证环境变量已恢复
+        assert os.environ["HTTPS_PROXY"] == original_proxy
+
+    def test_auth_cleans_up_when_no_original_proxy(self):
+        """验证 _auth() 在原始环境没有 HTTPS_PROXY 时也不残留"""
+        import os
+        from src.email.gmail_api import GmailApi
+
+        # 1. 确保原始环境没有 HTTPS_PROXY
+        os.environ.pop("HTTPS_PROXY", None)
+        os.environ.pop("HTTP_PROXY", None)
+
+        api = GmailApi("nonexistent.json", "nope.pkl",
+                       proxy_host="127.0.0.1", proxy_port=22222)
+        try:
+            api._auth()
+        except Exception:
+            pass
+
+        # 2. 验证环境变量已清理
+        assert "HTTPS_PROXY" not in os.environ
+        assert "HTTP_PROXY" not in os.environ
