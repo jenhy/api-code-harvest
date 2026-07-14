@@ -1,0 +1,27 @@
+[project]
+name = "api-code-harvest"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.48.0",
+    "requests>=2.32.0",
+    "pyyaml>=6.0",
+    "loguru>=0.7.0",
+    "google-api-python-client>=2.120.0",
+    "google-auth-oauthlib>=1.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "unit: Unit tests (pure logic, no I/O)",
+    "integration: Integration tests (real API calls)",
+    "e2e: End-to-end tests (real browser)",
+]

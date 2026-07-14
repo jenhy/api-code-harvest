@@ -1,0 +1,42 @@
+# 浏览器配置
+browser:
+  headless: false
+  viewport_width: 1280
+  viewport_height: 900
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+# 超时配置（秒）
+timeouts:
+  cloudflare_challenge: 120
+  turnstile: 180
+  slider_puzzle: 180
+  email_verification: 300
+  email_code: 120
+  page_load: 30
+
+# 重试配置
+retry:
+  max_registration_retries: 2
+  mail_api_retries: 3
+
+# 运行模式
+mode:
+  flow: "sequential"
+
+# 批量配置
+batch:
+  count: 1
+
+# 持久化路径
+storage:
+  accounts_file: "accounts.json"
+  codes_file: "codes.json"
+  log_file: "logs/harvest.log"
+
+# Gmail API 配置（用于读取验证邮件）
+gmail:
+  credentials_file: "credentials.json"
+  token_pickle: "token.pickle"
+  email_address: "ross.chen85.dev@gmail.com"
+  proxy_host: "127.0.0.1"
+  proxy_port: 22222
