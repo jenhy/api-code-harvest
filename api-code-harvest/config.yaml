@@ -40,3 +40,6 @@ gmail:
   email_address: "ross.chen85.dev@gmail.com"
   proxy_host: "127.0.0.1"
   proxy_port: 22222
+
+# Yahoo 主邮箱（用于 + 别名批量注册）
+yahoo_email: "rosschen85@yahoo.com"

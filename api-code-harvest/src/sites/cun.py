@@ -18,7 +18,7 @@ class CunRegistrar(HumanVerification):
     """CUN.ai full flow: register → verify → login → redeem → create API key"""
 
     REGISTER_URL = "https://www.cun.ai/sign-up"
-    LOGIN_URL = "https://www.cun.ai/login"
+    LOGIN_URL = "https://www.cun.ai/sign-in"
     WALLET_URL = "https://www.cun.ai/wallet"
 
     # ------------------------------------------------------------------
@@ -28,8 +28,13 @@ class CunRegistrar(HumanVerification):
     async def register(
         self, context: BrowserContext, email_addr: str,
         username: str, password: str, gmail_api=None,
+        email_code_fetcher=None,
     ) -> RegistrationResult:
-        """注册 CUN 账号。gmail_api 用于自动获取验证码。"""
+        """注册 CUN 账号。
+
+        gmail_api: 用于同步获取验证码（兼容旧版）。
+        email_code_fetcher: 异步 callable，返回 6 位验证码字符串（新版推荐）。
+        """
         page = await context.new_page()
         try:
             await page.goto(self.REGISTER_URL, wait_until="networkidle")
@@ -59,13 +64,15 @@ class CunRegistrar(HumanVerification):
                     return RegistrationResult(site="cun", success=False,
                                               error="Slider verification timeout")
 
-            # 从 Gmail API 获取验证码
+            # 获取验证码：优先异步 fetcher，再 Gmail API，最后手动输入
             email_code = None
-            if gmail_api:
-                to_addr = email_addr
-                print(f"  Waiting for verification code to {to_addr}...")
+            if email_code_fetcher:
+                print(f"  Waiting for verification code to {email_addr}...")
+                email_code = await email_code_fetcher()
+            elif gmail_api:
+                print(f"  Waiting for CUN verification code via Gmail...")
                 email_code = gmail_api.wait_for_verification_code(
-                    query=f"to:{to_addr}",
+                    query="from:cun.ai",
                     timeout=120,
                     poll_interval=5,
                 )

@@ -26,10 +26,13 @@ class GmailApi:
     """
 
     def __init__(self, credentials_file: str, token_pickle: str,
-                 proxy_host: str = "127.0.0.1", proxy_port: int = 22222):
+                 proxy_host: str = "", proxy_port: int = 0):
         self.credentials_file = credentials_file
         self.token_pickle = token_pickle
-        self.proxy = f"http://{proxy_host}:{proxy_port}"
+        if proxy_host and proxy_port:
+            self.proxy = f"http://{proxy_host}:{proxy_port}"
+        else:
+            self.proxy = ""
         self._service = None
 
     # ------------------------------------------------------------------
@@ -37,47 +40,30 @@ class GmailApi:
     # ------------------------------------------------------------------
 
     def _auth(self):
-        """Authenticate with Gmail API via OAuth. Caches token.pickle.
-
-        Uses save/restore pattern for HTTPS_PROXY to avoid global env pollution.
-        """
-        # 保存原始环境变量
-        saved_https_proxy = os.environ.pop("HTTPS_PROXY", None)
-        saved_http_proxy = os.environ.pop("HTTP_PROXY", None)
-
-        os.environ["HTTPS_PROXY"] = self.proxy
-        os.environ["HTTP_PROXY"] = self.proxy
-
-        try:
-            creds = None
-            if os.path.exists(self.token_pickle):
-                with open(self.token_pickle, "rb") as f:
-                    creds = pickle.load(f)
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
-                else:
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        self.credentials_file, SCOPES
-                    )
-                    creds = flow.run_local_server(port=0)
-                with open(self.token_pickle, "wb") as f:
-                    pickle.dump(creds, f)
-            return creds
-        finally:
-            # 恢复原始环境变量
-            if saved_https_proxy is not None:
-                os.environ["HTTPS_PROXY"] = saved_https_proxy
+        """Authenticate with Gmail API via OAuth. Caches token.pickle."""
+        creds = None
+        if os.path.exists(self.token_pickle):
+            with open(self.token_pickle, "rb") as f:
+                creds = pickle.load(f)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
             else:
-                os.environ.pop("HTTPS_PROXY", None)
-            if saved_http_proxy is not None:
-                os.environ["HTTP_PROXY"] = saved_http_proxy
-            else:
-                os.environ.pop("HTTP_PROXY", None)
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.credentials_file, SCOPES
+                )
+                creds = flow.run_local_server(port=0)
+            with open(self.token_pickle, "wb") as f:
+                pickle.dump(creds, f)
+        return creds
 
     @property
     def service(self):
         if self._service is None:
+            # 设置代理 — httplib2 懒读取环境变量，必须在这里保留
+            if self.proxy:
+                os.environ["HTTPS_PROXY"] = self.proxy
+                os.environ["HTTP_PROXY"] = self.proxy
             creds = self._auth()
             self._service = build("gmail", "v1", credentials=creds)
         return self._service

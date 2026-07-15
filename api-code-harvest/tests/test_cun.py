@@ -31,7 +31,7 @@ class TestCunRegistrarInstance:
 
     def test_urls_defined(self):
         assert CunRegistrar.REGISTER_URL == "https://www.cun.ai/sign-up"
-        assert CunRegistrar.LOGIN_URL == "https://www.cun.ai/login"
+        assert CunRegistrar.LOGIN_URL == "https://www.cun.ai/sign-in"
         assert CunRegistrar.WALLET_URL == "https://www.cun.ai/wallet"
 
 

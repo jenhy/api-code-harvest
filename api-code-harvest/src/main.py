@@ -15,6 +15,7 @@ from patchright.async_api import async_playwright
 
 from src.config import Settings
 from src.email.gmail_api import GmailApi
+from src.email.yahoo_checker import YahooMailReader
 from src.models import BatchResult
 from src.sites.hvoy import HvoyRegistrar
 from src.sites.cun import CunRegistrar
@@ -39,16 +40,22 @@ class Orchestrator:
             proxy_host=settings.gmail.proxy_host,
             proxy_port=settings.gmail.proxy_port,
         )
+        self.yahoo = YahooMailReader()
         self.base_email = settings.gmail.email_address
 
     def _make_alias(self, counter: int) -> str:
-        name, domain = self.base_email.split("@")
-        return f"{name}+hvoy{counter:03d}@{domain}"
+        """Yahoo + 别名：rosschen85+hvoyXXX@yahoo.com"""
+        yahoo = getattr(self.settings, "yahoo_email", None)
+        if not yahoo:
+            yahoo = "rosschen85@yahoo.com"
+        local, domain = yahoo.split("@", 1)
+        return f"{local}+hvoy{counter:03d}@{domain}"
 
-    async def run(self, count: int, resume: bool, dry_run: bool,
+    async def run(self, count: int, start: int = 1, resume: bool = False, dry_run: bool = False,
                   chrome_profile: str = ""):
         settings = self.settings
-        self.logger.info(f"start v2, count={count}")
+        self.start_index = start
+        self.logger.info(f"start v2, count={count}, start={start}")
 
         async with async_playwright() as p:
             if chrome_profile:
@@ -130,7 +137,7 @@ class Orchestrator:
 
     async def _run_full(self, context, count: int, result: BatchResult):
         for i in range(count):
-            idx = i + 1
+            idx = self.start_index + i
             print(f"\n{'='*60}")
             print(f"  Account {idx}/{count}")
             print(f"{'='*60}")
@@ -151,12 +158,10 @@ class Orchestrator:
                 result.failed += 1
                 continue
 
-            # === Step 3: Gmail API 收验证邮件 ===
-            print(f"\n  >>> [2/9] Waiting for hvoy verification email...")
-            verify_link = await self.gmail.wait_for_verification_link(
-                query=f"from:noreply@hvoy.ai to:{email_addr}",
-                domain="hvoy.ai",
-                timeout=120,
+            # === Step 3: Yahoo 收件箱收验证邮件 ===
+            print(f"\n  >>> [2/9] Waiting for hvoy verification email (Yahoo inbox)...")
+            verify_link = await self.yahoo.wait_for_verification_link(
+                context, timeout=120, poll_interval=5,
             )
             if not verify_link:
                 self.logger.error(f"[{idx}] hvoy verification email not found")
@@ -168,7 +173,7 @@ class Orchestrator:
                           timeout=20000)
             await vp.wait_for_timeout(3000)
             # 点击"去登录"按钮确认邮箱验证
-            go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")')
+            go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")').first
             if await go_login.count() > 0:
                 await go_login.click()
                 await vp.wait_for_timeout(2000)
@@ -197,7 +202,8 @@ class Orchestrator:
             # === Step 6-7: CUN 注册 + 滑块1 ===
             print(f"\n  >>> [5/9] CUN.ai register (invite: 44Wb)...")
             cun_result = await self.cun.register(
-                context, email_addr, username, password, gmail_api=self.gmail,
+                context, email_addr, username, password,
+                email_code_fetcher=lambda: self.yahoo.wait_for_verification_code(context),
             )
             if not cun_result.success:
                 self.logger.error(
@@ -252,7 +258,7 @@ class Orchestrator:
                          f"skipping them")
         self.logger.info(f"Starting fresh rounds from next index")
 
-        for idx in range(1, count + 1):
+        for idx in range(self.start_index, count + self.start_index):
             email_addr = self._make_alias(idx)
             if email_addr in used_emails:
                 self.logger.info(f"  Skipping {email_addr} (already done)")
@@ -283,10 +289,10 @@ class Orchestrator:
             result.failed += 1
             return
 
-        print(f"\n  >>> [2/9] Waiting for hvoy verification email...")
-        verify_link = await self.gmail.wait_for_verification_link(
-            query=f"from:noreply@hvoy.ai to:{email_addr}",
-            domain="hvoy.ai", timeout=120)
+        print(f"\n  >>> [2/9] Waiting for hvoy verification email (Yahoo inbox)...")
+        verify_link = await self.yahoo.wait_for_verification_link(
+            context, timeout=120, poll_interval=5,
+        )
         if not verify_link:
             self.logger.error(f"[{idx}] hvoy verification email not found")
             result.failed += 1
@@ -296,7 +302,7 @@ class Orchestrator:
         await vp.goto(verify_link, wait_until="domcontentloaded", timeout=20000)
         await vp.wait_for_timeout(3000)
         # 点击"去登录"按钮确认邮箱验证
-        go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")')
+        go_login = vp.locator('button:has-text("去登录"), a:has-text("去登录")').first
         if await go_login.count() > 0:
             await go_login.click()
             await vp.wait_for_timeout(2000)
@@ -320,7 +326,8 @@ class Orchestrator:
 
         print(f"\n  >>> [5/9] CUN.ai register (invite: 44Wb)...")
         cun_result = await self.cun.register(
-            context, email_addr, username, password, gmail_api=self.gmail)
+            context, email_addr, username, password,
+            email_code_fetcher=lambda: self.yahoo.wait_for_verification_code(context))
         if not cun_result.success:
             self.logger.error(f"[{idx}] CUN register failed: "
                               f"{cun_result.error}")
@@ -378,6 +385,8 @@ def main():
     parser = argparse.ArgumentParser(description="API Code Harvester v2")
     parser.add_argument("--count", type=int, default=1,
                         help="Number of cycles to run")
+    parser.add_argument("--start", type=int, default=1,
+                        help="Start index for email alias (default: 1 = +hvoy001)")
     parser.add_argument("--resume", action="store_true",
                         help="Resume from last completed cycle")
     parser.add_argument("--dry-run", action="store_true",
@@ -404,6 +413,7 @@ def main():
 
     asyncio.run(Orchestrator(settings).run(
         count=args.count,
+        start=args.start,
         resume=args.resume,
         dry_run=args.dry_run,
         chrome_profile=args.chrome_profile,

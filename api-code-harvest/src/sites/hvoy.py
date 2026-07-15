@@ -38,7 +38,16 @@ class HvoyRegistrar(HumanVerification):
 
             await self._fill_form(page, username, email_addr, password)
             await page.locator('button[type="submit"]').click()
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(5000)
+
+            # 检查注册结果：成功或错误
+            body_text = await page.inner_text("body")
+            error_keywords = ["已存在", "已被注册", "error", "失败", "invalid"]
+            if any(kw in body_text.lower() for kw in error_keywords):
+                return RegistrationResult(
+                    site="hvoy", success=False,
+                    error=f"Registration rejected: {body_text[:200]}",
+                )
 
             return RegistrationResult(
                 site="hvoy", success=True,

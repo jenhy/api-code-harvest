@@ -63,6 +63,7 @@ class Settings:
     batch: BatchConfig = field(default_factory=BatchConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     gmail: GmailConfig = field(default_factory=GmailConfig)
+    yahoo_email: str = ""
 
     @classmethod
     def from_yaml(cls, path: str) -> "Settings":
@@ -76,4 +77,5 @@ class Settings:
             batch=BatchConfig(**data.get("batch", {})),
             storage=StorageConfig(**data.get("storage", {})),
             gmail=GmailConfig(**data.get("gmail", {})),
+            yahoo_email=data.get("yahoo_email", ""),
         )
