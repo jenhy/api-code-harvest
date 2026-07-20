@@ -1,0 +1,16 @@
+# 隐私信息 — API KEY 禁止上传
+config.yaml
+
+# Python 字节码缓存
+__pycache__/
+*.pyc
+
+# Node.js 依赖
+node_modules/
+package-lock.json
+
+# 环境文件
+.env
+.mcp.json
+
+# 临时测试文件（按需保留）
